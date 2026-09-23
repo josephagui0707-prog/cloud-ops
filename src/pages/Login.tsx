@@ -240,11 +240,6 @@ export default function Login() {
                   'Continuar'
                 )}
               </button>
-
-              <p className="mt-6 text-center text-[13px] text-ink-soft">
-                Cuentas de prueba: <span className="text-ink">admin@cloudops.io</span> ·{' '}
-                <span className="text-ink">DevOps#2025</span> (ejemplo)
-              </p>
             </form>
           ) : (
             <form onSubmit={handlePasswordSubmit} noValidate>
