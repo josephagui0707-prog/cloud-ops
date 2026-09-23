@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { Toaster } from 'sonner'; // <-- Importante
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { SimulationProvider } from './context/SimulationContext';
@@ -17,24 +18,27 @@ export default function App() {
   return (
     <ThemeProvider>
       <SimulationProvider>
-      <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/dashboard/planning" element={<Planning />} />
-            <Route path="/dashboard/costs" element={<Costs />} />
-            <Route path="/dashboard/infrastructure" element={<Infrastructure />} />
-            <Route path="/dashboard/security" element={<Security />} />
-            <Route path="/dashboard/network" element={<NetworkPage />} />
-            <Route path="/dashboard/services" element={<Services />} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-      </AuthProvider>
+        <AuthProvider>
+          <BrowserRouter>
+
+            <Toaster richColors position="top-right" closeButton />
+            
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/dashboard/planning" element={<Planning />} />
+                <Route path="/dashboard/costs" element={<Costs />} />
+                <Route path="/dashboard/infrastructure" element={<Infrastructure />} />
+                <Route path="/dashboard/security" element={<Security />} />
+                <Route path="/dashboard/network" element={<NetworkPage />} />
+                <Route path="/dashboard/services" element={<Services />} />
+                <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              </Route>
+            </Routes>
+          </BrowserRouter>
+        </AuthProvider>
       </SimulationProvider>
     </ThemeProvider>
   );

@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { CheckCircle2, CircleDollarSign, Cpu, Database, HardDrive, Info, Network, Route, Shield, Sparkles, Users, Globe2 } from 'lucide-react';
+import { toast } from 'sonner'; // <-- 1. Importamos el toast moderno
 import { Card, Page, Title, usd, services, staggerContainer, staggerItem, tapScale } from '../components/PageUI';
 import { useSimulation, type SimulationCostItem } from '../context/SimulationContext';
 
-const rates: Record<string, { rate: number; unit: string; detail: string }> = {
+const rates: Record<string, { rate: number; unit: number | string; detail: string }> = {
   EC2: { rate: 0.0104, unit: 'USD/h', detail: 't3.micro Linux On-Demand' },
   RDS: { rate: 0.017, unit: 'USD/h', detail: 'db.t3.micro MySQL Single-AZ' },
   S3: { rate: 0.023, unit: 'USD/GB-mes', detail: 'S3 Standard' },
@@ -49,7 +50,7 @@ export function Planning() {
     else if (service === 'CloudFront') { monthly = quantity * config.rate; usage = `${quantity} GB`; }
     else if (service === 'Route 53') { monthly = quantity * config.rate; usage = `${quantity} zona(s)`; }
     else { monthly = 0; usage = 'Sin costo directo'; }
-    return { service, detail: config.detail, quantity, usage, rate: config.rate, unit: config.unit, monthly };
+    return { service, detail: config.detail, quantity, usage, rate: config.rate, unit: config.unit as string, monthly };
   }), [selected, quantities]);
 
   const monthlyCost = costItems.reduce((sum, item) => sum + item.monthly, 0);
@@ -57,8 +58,40 @@ export function Planning() {
 
   const generateSimulation = () => {
     if (!selected.length) return;
-    saveSimulation({ name: name || 'Nueva solución Cloud', type, region, users, availability, objective, description, selectedServices: selected, costItems, monthlyCost, annualCost: monthlyCost * 12, createdAt: new Date().toISOString() });
+    
+    saveSimulation({ 
+      name: name || 'Nueva solución Cloud', 
+      type, 
+      region, 
+      users, 
+      availability, 
+      objective, 
+      description, 
+      selectedServices: selected, 
+      costItems, 
+      monthlyCost, 
+      annualCost: monthlyCost * 12, 
+      createdAt: new Date().toISOString() 
+    });
+    
     setSaved(true);
+
+    // Toast personalizado con barra de carga animada
+    toast.success(
+      <div className="flex flex-col gap-1 w-full">
+        <span className="font-semibold">¡Planificación generada con éxito!</span>
+        <span className="text-xs opacity-90">Se ha guardado en localStorage.</span>
+        
+        {/* Barra de progreso con animación CSS de duración (4 segundos) */}
+        <div className="w-full bg-black/10 dark:bg-white/20 h-1 rounded-full overflow-hidden mt-1">
+          <div className="bg-emerald-500 h-full animate-toast-progress" />
+        </div>
+      </div>,
+      {
+        duration: 4000,
+        className: 'custom-progress-toast',
+      }
+    );
   };
 
   return <Page>
@@ -98,8 +131,8 @@ export function Planning() {
             </div>}
 
             <div className="wide form-actions">
-              <motion.button className="primary-button" type="submit" disabled={!selected.length} whileHover={{ y: -2 }} whileTap={tapScale}><Sparkles size={17}/> Generar simulación</motion.button>
-              <AnimatePresence>{saved && <motion.span className="saved" initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}><CheckCircle2 size={17}/> Simulación guardada en localStorage</motion.span>}</AnimatePresence>
+              <motion.button className="primary-button" type="submit" disabled={!selected.length} whileHover={{ y: -2 }} whileTap={tapScale}><Sparkles size={17}/> Generar planificación</motion.button>
+              <AnimatePresence>{saved && <motion.span className="saved" initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}><CheckCircle2 size={17}/>Guardada en localStorage</motion.span>}</AnimatePresence>
             </div>
           </form>
         </Card>
@@ -110,7 +143,7 @@ export function Planning() {
           <Card className="recommendation-card"><div className="card-header"><div><span className="section-kicker">CÁLCULO</span><h3>Resumen de recursos</h3></div><CircleDollarSign size={19}/></div><div className="recommendation-list"><span><CheckCircle2 size={15}/> {selected.length} servicios incluidos</span><span><CheckCircle2 size={15}/> {costItems.filter(x => x.monthly > 0).length} servicios con costo directo</span><span><CheckCircle2 size={15}/> {users.toLocaleString()} usuarios estimados</span><span><CheckCircle2 size={15}/> {availability}</span></div></Card>
         </div>
       </div>
-      <Card className="pricing-table-card combined-breakdown"><div className="card-header"><div><span className="section-kicker">BREAKDOWN</span><h3>Detalle del cálculo de la simulación</h3></div><span className="mini-badge">Pay-as-you-go</span></div><div className="pricing-table"><div className="pricing-row head"><span>Servicio</span><span>Tarifa de referencia</span><span>Consumo</span><span>Subtotal</span></div>{costItems.map(item => <div className="pricing-row" key={item.service}><span><b>{item.service}</b><small>{item.detail}</small></span><span>{item.rate === 0 ? 'Sin costo directo' : `${usd(item.rate)} ${item.unit}`}</span><span>{item.usage}</span><strong>{usd(item.monthly)}</strong></div>)}</div></Card>
+      <Card className="pricing-table-card combined-breakdown"><div className="card-header"><div><span className="section-kicker">BREAKDOWN</span><h3>Detalle del cálculo de los costos</h3></div><span className="mini-badge">Pago referenciado</span></div><div className="pricing-table"><div className="pricing-row head"><span>Servicio</span><span>Tarifa de referencia</span><span>Consumo</span><span>Subtotal</span></div>{costItems.map(item => <div className="pricing-row" key={item.service}><span><b>{item.service}</b><small>{item.detail}</small></span><span>{item.rate === 0 ? 'Sin costo directo' : `${usd(item.rate)} ${item.unit}`}</span><span>{item.usage}</span><strong>{usd(item.monthly)}</strong></div>)}</div></Card>
       <motion.div className="pricing-note" variants={staggerItem}><Info size={18}/><div><b>Una sola fuente de datos</b><span>Al pulsar “Generar simulación”, esta configuración, los servicios, cantidades y costos se guardan juntos y el Dashboard se actualiza con el escenario generado.</span></div></motion.div>
     </motion.div>
   </Page>;

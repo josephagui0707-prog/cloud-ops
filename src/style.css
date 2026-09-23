@@ -631,3 +631,15 @@ body, .card, .topbar, .sidebar, .form-grid input, .form-grid select, .form-grid 
   .planner-layout-combined { grid-template-columns: 1fr; }
   .simulation-input-grid { grid-template-columns: 1fr; }
 }
+@keyframes toastProgress {
+  0% {
+    width: 100%;
+  }
+  100% {
+    width: 0%;
+  }
+}
+
+.animate-toast-progress {
+  animation: toastProgress 4s linear forwards;
+}
