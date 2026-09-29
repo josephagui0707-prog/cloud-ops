@@ -1,152 +1,969 @@
 import { useMemo, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
-import { CheckCircle2, CircleDollarSign, Cpu, Database, HardDrive, Info, Network, Route, Shield, Sparkles, Users, Globe2 } from 'lucide-react';
-import { toast } from 'sonner'; // <-- 1. Importamos el toast moderno
-import { Card, Page, Title, usd, services, staggerContainer, staggerItem, tapScale } from '../components/PageUI';
-import { useSimulation, type SimulationCostItem } from '../context/SimulationContext';
+import { motion } from 'framer-motion';
+import {
+  Activity, AlertTriangle, CheckCircle2, CircleDollarSign, Cloud, Copy,
+  Database, Globe2, HardDrive, Pencil, Plus, Route, Server, Shield,
+  Trash2, Users
+} from 'lucide-react';
+import { toast } from 'sonner';
+import { Link } from 'react-router-dom';
 
-const rates: Record<string, { rate: number; unit: number | string; detail: string }> = {
+import {
+  Card, Page, Title, usd, services, staggerContainer, staggerItem
+} from '../components/PageUI';
+
+import {
+  useSimulation,
+  type SimulationInput,
+  type Simulation,
+  type SimulationCostItem
+} from '../context/SimulationContext';
+
+const rates: Record<string, { rate: number; unit: string; detail: string }> = {
   EC2: { rate: 0.0104, unit: 'USD/h', detail: 't3.micro Linux On-Demand' },
   RDS: { rate: 0.017, unit: 'USD/h', detail: 'db.t3.micro MySQL Single-AZ' },
   S3: { rate: 0.023, unit: 'USD/GB-mes', detail: 'S3 Standard' },
   CloudFront: { rate: 0.085, unit: 'USD/GB', detail: 'Transferencia de datos a Internet' },
-  'Route 53': { rate: 0.50, unit: 'USD/zona-mes', detail: 'Zona alojada' },
+  'Route 53': { rate: 0.5, unit: 'USD/zona-mes', detail: 'Zona alojada' },
   IAM: { rate: 0, unit: 'USD/mes', detail: 'Gestión de identidades y accesos' },
-  VPC: { rate: 0, unit: 'USD/mes', detail: 'Red virtual privada (sin gateways adicionales)' },
+  VPC: { rate: 0, unit: 'USD/mes', detail: 'Red virtual privada' }
 };
 
-const icons: Record<string, any> = { EC2: Cpu, RDS: Database, S3: HardDrive, CloudFront: Globe2, 'Route 53': Route, IAM: Shield, VPC: Network };
+const icons: Record<string, any> = {
+  EC2: Server,
+  RDS: Database,
+  S3: HardDrive,
+  CloudFront: Globe2,
+  'Route 53': Route,
+  IAM: Shield,
+  VPC: Cloud
+};
+
+const defaultSelected: string[] = [];
+const defaultQuantities: Record<string, number> = {};
+
+const emptyForm = {
+  name: '',
+  type: 'Aplicación web empresarial',
+  region: 'US East (Ohio)',
+  users: 500,
+  availability: 'Alta disponibilidad',
+  objective: 'Escalabilidad y reducción de costos',
+  description: '',
+  selected: [...defaultSelected],
+  quantities: { ...defaultQuantities }
+};
+
+function formFromSimulation(simulation: Simulation) {
+  const quantities = simulation.costItems.reduce<Record<string, number>>(
+    (acc, item) => ({ ...acc, [item.service]: item.quantity }),
+    { ...defaultQuantities }
+  );
+
+  return {
+    name: simulation.name,
+    type: simulation.type,
+    region: simulation.region,
+    users: simulation.users,
+    availability: simulation.availability,
+    objective: simulation.objective,
+    description: simulation.description,
+    selected: [...simulation.selectedServices],
+    quantities
+  };
+}
 
 export function Planning() {
-  const [name, setName] = useState('Plataforma Empresarial Cloud');
-  const [type, setType] = useState('Aplicación web empresarial');
-  const [region, setRegion] = useState('US East (Ohio)');
-  const [users, setUsers] = useState(500);
-  const [availability, setAvailability] = useState('Alta disponibilidad');
-  const [objective, setObjective] = useState('Escalabilidad y reducción de costos');
-  const [description, setDescription] = useState('Aplicación empresarial que requiere una arquitectura escalable, segura y con estimación de costos antes del despliegue.');
-  const [selected, setSelected] = useState<string[]>(['EC2', 'S3', 'RDS', 'IAM', 'VPC', 'Route 53', 'CloudFront']);
-  const [quantities, setQuantities] = useState<Record<string, number>>({ EC2: 2, RDS: 1, S3: 100, CloudFront: 250, 'Route 53': 1, IAM: 1, VPC: 1 });
-  const [saved, setSaved] = useState(false);
-  const { saveSimulation } = useSimulation();
+  const {
+    simulations,
+    activeSimulation,
+    createSimulation,
+    updateSimulation,
+    setActiveSimulation,
+    deleteSimulation,
+    duplicateSimulation
+  } = useSimulation();
 
-  const toggle = (service: string) => {
-    setSelected(current => current.includes(service) ? current.filter(x => x !== service) : [...current, service]);
-    setSaved(false);
+  const [form, setForm] = useState(() =>
+    activeSimulation ? formFromSimulation(activeSimulation) : emptyForm
+  );
+
+  const [editingId, setEditingId] = useState<string | null>(
+    activeSimulation?.id ?? null
+  );
+
+  const costItems = useMemo<SimulationCostItem[]>(() => {
+    return form.selected.map((service) => {
+      const config = rates[service];
+      const quantity = Math.max(0, form.quantities[service] ?? 1);
+      let monthly = 0;
+      let usage = `${quantity}`;
+
+      if (service === 'EC2' || service === 'RDS') {
+        monthly = quantity * 730 * config.rate;
+        usage = `${quantity} × 730 h`;
+      } else if (service === 'S3' || service === 'CloudFront') {
+        monthly = quantity * config.rate;
+        usage = `${quantity} GB`;
+      } else if (service === 'Route 53') {
+        monthly = quantity * config.rate;
+        usage = `${quantity} zona(s)`;
+      } else {
+        usage = 'Sin costo directo';
+      }
+
+      return {
+        service,
+        detail: config.detail,
+        quantity,
+        usage,
+        rate: config.rate,
+        unit: config.unit,
+        monthly
+      };
+    });
+  }, [form.selected, form.quantities]);
+
+  const monthlyCost = useMemo(
+    () => costItems.reduce((sum, item) => sum + item.monthly, 0),
+    [costItems]
+  );
+
+  const annualCost = monthlyCost * 12;
+
+  const canSave =
+    form.name.trim().length >= 3 &&
+    form.description.trim().length >= 10 &&
+    form.users > 0 &&
+    form.selected.length > 0;
+
+  const updateForm = <K extends keyof typeof form>(
+    key: K,
+    value: (typeof form)[K]
+  ) => {
+    setForm((current) => ({ ...current, [key]: value }));
+  };
+
+  const toggleService = (service: string) => {
+    setForm((current) => {
+      const exists = current.selected.includes(service);
+
+      if (exists) {
+        const nextQuantities = { ...current.quantities };
+        delete nextQuantities[service];
+
+        return {
+          ...current,
+          selected: current.selected.filter((item) => item !== service),
+          quantities: nextQuantities
+        };
+      }
+
+      return {
+        ...current,
+        selected: [...current.selected, service],
+        quantities: {
+          ...current.quantities,
+          [service]: 1
+        }
+      };
+    });
   };
 
   const setQuantity = (service: string, value: number) => {
-    setQuantities(current => ({ ...current, [service]: Math.max(0, value) }));
-    setSaved(false);
-  };
-
-  const costItems = useMemo<SimulationCostItem[]>(() => selected.map(service => {
-    const config = rates[service];
-    const quantity = quantities[service] ?? 1;
-    let monthly = 0;
-    let usage = `${quantity}`;
-    if (service === 'EC2' || service === 'RDS') { monthly = quantity * 730 * config.rate; usage = `${quantity} × 730 h`; }
-    else if (service === 'S3') { monthly = quantity * config.rate; usage = `${quantity} GB`; }
-    else if (service === 'CloudFront') { monthly = quantity * config.rate; usage = `${quantity} GB`; }
-    else if (service === 'Route 53') { monthly = quantity * config.rate; usage = `${quantity} zona(s)`; }
-    else { monthly = 0; usage = 'Sin costo directo'; }
-    return { service, detail: config.detail, quantity, usage, rate: config.rate, unit: config.unit as string, monthly };
-  }), [selected, quantities]);
-
-  const monthlyCost = costItems.reduce((sum, item) => sum + item.monthly, 0);
-  const profile = users > 1500 ? 'Carga media/alta' : users > 500 ? 'Carga media' : 'Carga inicial';
-
-  const generateSimulation = () => {
-    if (!selected.length) return;
-    
-    saveSimulation({ 
-      name: name || 'Nueva solución Cloud', 
-      type, 
-      region, 
-      users, 
-      availability, 
-      objective, 
-      description, 
-      selectedServices: selected, 
-      costItems, 
-      monthlyCost, 
-      annualCost: monthlyCost * 12, 
-      createdAt: new Date().toISOString() 
-    });
-    
-    setSaved(true);
-
-    // Toast personalizado con barra de carga animada
-    toast.success(
-      <div className="flex flex-col gap-1 w-full">
-        <span className="font-semibold">¡Planificación generada con éxito!</span>
-        <span className="text-xs opacity-90">Se ha guardado en localStorage.</span>
-        
-        {/* Barra de progreso con animación CSS de duración (4 segundos) */}
-        <div className="w-full bg-black/10 dark:bg-white/20 h-1 rounded-full overflow-hidden mt-1">
-          <div className="bg-emerald-500 h-full animate-toast-progress" />
-        </div>
-      </div>,
-      {
-        duration: 4000,
-        className: 'custom-progress-toast',
+    setForm((current) => ({
+      ...current,
+      quantities: {
+        ...current.quantities,
+        [service]: Math.max(0, value || 0)
       }
-    );
+    }));
   };
 
-  return <Page>
-    <motion.div variants={staggerContainer} initial="hidden" animate="show">
-      <Title t="Planificación y costos Cloud" s="Define la solución, selecciona los servicios y calcula automáticamente el escenario que llegará al Dashboard" tag="CLOUD PLANNING + FINOPS" />
-      <motion.div className="planner-stepper" variants={staggerItem}><span className="active"><b>1</b>Requisitos</span><i/><span className="active"><b>2</b>Servicios</span><i/><span className="active"><b>3</b>Costos</span><i/><span><b>4</b>Simulación</span></motion.div>
+  const loadSimulation = (simulation: Simulation) => {
+    setForm(formFromSimulation(simulation));
+    setEditingId(simulation.id);
+  };
 
-      <div className="planner-layout planner-layout-combined">
-        <Card className="form-card planner-form">
-          <div className="card-header"><div><span className="section-kicker">WORKLOAD PROFILE</span><h3>Definición de la solución</h3><p>Los datos de esta pantalla alimentan directamente la simulación.</p></div><span className="mini-badge">Simulación local</span></div>
-          <form onSubmit={e => { e.preventDefault(); generateSimulation(); }} className="form-grid">
-            <label><span>Nombre de la solución</span><input value={name} onChange={e => setName(e.target.value)} /></label>
-            <label><span>Tipo de aplicación</span><select value={type} onChange={e => setType(e.target.value)}><option>Aplicación web empresarial</option><option>E-commerce</option><option>API / Backend</option><option>Portal de clientes</option></select></label>
-            <label><span>Región principal</span><select value={region} onChange={e => setRegion(e.target.value)}><option>US East (Ohio)</option><option>Europe (Ireland)</option><option>South America (São Paulo)</option></select></label>
-            <label><span>Usuarios estimados</span><input type="number" min="1" value={users} onChange={e => setUsers(Number(e.target.value))} /></label>
-            <label><span>Disponibilidad requerida</span><select value={availability} onChange={e => setAvailability(e.target.value)}><option>Alta disponibilidad</option><option>Estándar</option><option>Crítica 24/7</option></select></label>
-            <label><span>Objetivo principal</span><select value={objective} onChange={e => setObjective(e.target.value)}><option>Escalabilidad y reducción de costos</option><option>Modernización</option><option>Continuidad del negocio</option><option>Rendimiento global</option></select></label>
-            <label className="wide"><span>Descripción del proyecto</span><textarea value={description} onChange={e => setDescription(e.target.value)} /></label>
+  const newSimulation = () => {
+    setForm({
+      ...emptyForm,
+      selected: [],
+      quantities: {}
+    });
+    setEditingId(null);
+  };
 
-            <div className="wide service-selector">
-              <div className="field-title">Servicios y recursos de la simulación</div>
-              <motion.div className="service-choice-grid" variants={staggerContainer} initial="hidden" animate="show">
-                {services.map(([service, category, , Icon]) => {
-                  const active = selected.includes(service);
-                  return <motion.button type="button" variants={staggerItem} whileHover={{ y: -2 }} whileTap={tapScale} className={active ? 'service-choice selected' : 'service-choice'} onClick={() => toggle(service)} key={service}>
-                    <Icon size={18}/><span><b>{service}</b><small>{category}</small></span>{active && <CheckCircle2 size={16}/>} 
-                  </motion.button>;
-                })}
-              </motion.div>
-            </div>
+  const save = () => {
+    if (!canSave) {
+      toast.error('Completa correctamente los datos requeridos.');
+      return;
+    }
 
-            {selected.length > 0 && <div className="wide simulation-inputs">
-              <div className="field-title">Consumo estimado</div>
-              <div className="simulation-input-grid">
-                {selected.map(service => { const Icon = icons[service] || Cpu; return <div className="simulation-input" key={service}><div><Icon size={16}/><b>{service}</b><small>{service === 'EC2' || service === 'RDS' ? 'instancias' : service === 'S3' || service === 'CloudFront' ? 'GB' : service === 'Route 53' ? 'zonas' : 'recursos'}</small></div><input type="number" min="0" value={quantities[service] ?? 1} onChange={e => setQuantity(service, Number(e.target.value))} /></div>; })}
-              </div>
-            </div>}
+    const data: SimulationInput = {
+      name: form.name.trim(),
+      type: form.type,
+      region: form.region,
+      users: form.users,
+      availability: form.availability,
+      objective: form.objective,
+      description: form.description.trim(),
+      selectedServices: form.selected,
+      costItems,
+      monthlyCost,
+      annualCost,
+      createdAt:
+        editingId && activeSimulation?.id === editingId
+          ? activeSimulation.createdAt
+          : new Date().toISOString()
+    };
 
-            <div className="wide form-actions">
-              <motion.button className="primary-button" type="submit" disabled={!selected.length} whileHover={{ y: -2 }} whileTap={tapScale}><Sparkles size={17}/> Generar planificación</motion.button>
-              <AnimatePresence>{saved && <motion.span className="saved" initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}><CheckCircle2 size={17}/>Guardada en localStorage</motion.span>}</AnimatePresence>
-            </div>
-          </form>
-        </Card>
+    if (editingId) {
+      updateSimulation(editingId, data);
+      setActiveSimulation(editingId);
+      toast.success('Planificación actualizada.');
+    } else {
+      const created = createSimulation(data);
+      setEditingId(created.id);
+      toast.success('Nueva planificación creada.');
+    }
+  };
 
-        <div className="planner-side">
-          <Card className="estimate-hero combined-estimate"><div className="estimate-label"><CircleDollarSign size={18}/> ESTIMACIÓN GENERADA</div><motion.strong key={monthlyCost} initial={{ opacity: 0.4, scale: .97 }} animate={{ opacity: 1, scale: 1 }}>{usd(monthlyCost)}</motion.strong><span>por mes</span><small>Proyección anual: {usd(monthlyCost * 12)}</small><div className="estimate-progress"><motion.i animate={{ width: `${Math.min(100, monthlyCost / 2)}%` }} /></div><p>Los costos son referencias para la simulación; el valor real de AWS depende de región, uso y descuentos.</p></Card>
-          <Card className="blueprint-card"><div className="blueprint-head"><span><Users size={18}/></span><div><small>LIVE SIMULATION</small><h3>{name || 'Nueva solución'}</h3></div></div><div className="blueprint-metrics"><div><span>Perfil</span><b>{profile}</b></div><div><span>Usuarios</span><b>{users.toLocaleString()}</b></div><div><span>Región</span><b>{region.replace('US East ','').replace('South America ','').replace('Europe ','')}</b></div><div><span>Servicios</span><b>{selected.length}</b></div></div><div className="blueprint-flow"><span>Internet</span><i>→</i><span>Edge</span><i>→</i><span>VPC</span><i>→</i><span>App + DB</span></div></Card>
-          <Card className="recommendation-card"><div className="card-header"><div><span className="section-kicker">CÁLCULO</span><h3>Resumen de recursos</h3></div><CircleDollarSign size={19}/></div><div className="recommendation-list"><span><CheckCircle2 size={15}/> {selected.length} servicios incluidos</span><span><CheckCircle2 size={15}/> {costItems.filter(x => x.monthly > 0).length} servicios con costo directo</span><span><CheckCircle2 size={15}/> {users.toLocaleString()} usuarios estimados</span><span><CheckCircle2 size={15}/> {availability}</span></div></Card>
+  const activate = (simulation: Simulation) => {
+    setActiveSimulation(simulation.id);
+    loadSimulation(simulation);
+    toast.success(`"${simulation.name}" está activa.`);
+  };
+
+  const duplicate = (simulation: Simulation) => {
+    const copy = duplicateSimulation(simulation.id);
+    if (copy) {
+      loadSimulation(copy);
+      toast.success('Planificación duplicada.');
+    }
+  };
+
+  const remove = (simulation: Simulation) => {
+    if (!window.confirm(`¿Eliminar "${simulation.name}"?`)) return;
+
+    deleteSimulation(simulation.id);
+
+    if (editingId === simulation.id) {
+      const next = simulations.find((item) => item.id !== simulation.id);
+      if (next) loadSimulation(next);
+      else newSimulation();
+    }
+
+    toast.success('Planificación eliminada.');
+  };
+
+  return (
+    <Page>
+      <motion.div variants={staggerContainer} initial="hidden" animate="show">
+        <Title
+          t="Planificación Cloud"
+          s="Crea y administra diferentes escenarios Cloud para analizar configuraciones, costos y arquitectura."
+          tag="CLOUD SCENARIOS"
+        />
+
+        <div className="simulation-meta-strip">
+          <span><b>Escenarios:</b> {simulations.length}</span>
+          <span><b>Activo:</b> {activeSimulation?.name ?? 'Ninguno'}</span>
+          <span>
+            <b>Costo activo:</b>{' '}
+            {activeSimulation ? usd(activeSimulation.monthlyCost) : usd(0)}
+          </span>
         </div>
-      </div>
-      <Card className="pricing-table-card combined-breakdown"><div className="card-header"><div><span className="section-kicker">BREAKDOWN</span><h3>Detalle del cálculo de los costos</h3></div><span className="mini-badge">Pago referenciado</span></div><div className="pricing-table"><div className="pricing-row head"><span>Servicio</span><span>Tarifa de referencia</span><span>Consumo</span><span>Subtotal</span></div>{costItems.map(item => <div className="pricing-row" key={item.service}><span><b>{item.service}</b><small>{item.detail}</small></span><span>{item.rate === 0 ? 'Sin costo directo' : `${usd(item.rate)} ${item.unit}`}</span><span>{item.usage}</span><strong>{usd(item.monthly)}</strong></div>)}</div></Card>
-      <motion.div className="pricing-note" variants={staggerItem}><Info size={18}/><div><b>Una sola fuente de datos</b><span>Al pulsar “Generar simulación”, esta configuración, los servicios, cantidades y costos se guardan juntos y el Dashboard se actualiza con el escenario generado.</span></div></motion.div>
-    </motion.div>
-  </Page>;
+
+        <motion.div
+          variants={staggerItem}
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 12,
+            flexWrap: 'wrap',
+            marginTop: 16,
+            marginBottom: 14
+          }}
+        >
+          <div>
+            <span className="section-kicker">SCENARIO MANAGER</span>
+            <h3 style={{ margin: '4px 0 0', color: 'var(--text)' }}>
+              Tus planificaciones
+            </h3>
+          </div>
+
+          <button
+            type="button"
+            className="primary-button"
+            onClick={newSimulation}
+          >
+            <Plus size={16} />
+            Nueva planificación
+          </button>
+        </motion.div>
+
+        <motion.div
+          variants={staggerContainer}
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+            gap: 12
+          }}
+        >
+          {simulations.map((item) => {
+            const active = item.id === activeSimulation?.id;
+            const editing = item.id === editingId;
+
+            return (
+              <Card
+                key={item.id}
+                hoverable
+                style={{
+                  border: active ? '1px solid rgba(37,99,235,.45)' : undefined,
+                  boxShadow: active
+                    ? '0 8px 28px rgba(37,99,235,.10)'
+                    : undefined
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    gap: 10,
+                    alignItems: 'flex-start'
+                  }}
+                >
+                  <div>
+                    <span className="section-kicker">
+                      {active ? 'ACTIVE SCENARIO' : 'SCENARIO'}
+                    </span>
+                    <h3 style={{ margin: '5px 0 3px', color: 'var(--text)' }}>
+                      {item.name}
+                    </h3>
+                    <p style={{ margin: 0, fontSize: 11 }}>
+                      {item.region} · {item.selectedServices.length} servicios
+                    </p>
+                  </div>
+
+                  <span className={active ? 'status-badge success' : 'mini-badge'}>
+                    {active ? 'Activa' : 'Disponible'}
+                  </span>
+                </div>
+
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: 8,
+                    marginTop: 13
+                  }}
+                >
+                  <div className="service-function">
+                    <CircleDollarSign size={15} />
+                    <span>
+                      <b>{usd(item.monthlyCost)}</b>
+                      <small>mensual</small>
+                    </span>
+                  </div>
+
+                  <div className="service-function">
+                    <Users size={15} />
+                    <span>
+                      <b>{item.users.toLocaleString()}</b>
+                      <small>usuarios</small>
+                    </span>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: 6,
+                    flexWrap: 'wrap',
+                    marginTop: 13
+                  }}
+                >
+                  {!active && (
+                    <button
+                      type="button"
+                      className="primary-button"
+                      onClick={() => activate(item)}
+                      style={{ flex: 1 }}
+                    >
+                      Activar
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    className="mini-badge"
+                    onClick={() => loadSimulation(item)}
+                    style={{
+                      cursor: 'pointer',
+                      border: '1px solid var(--border)',
+                      background: 'var(--card)',
+                      color: 'var(--text)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 5
+                    }}
+                  >
+                    <Pencil size={13} />
+                    {editing ? 'Editando' : 'Editar'}
+                  </button>
+
+                  <button
+                    type="button"
+                    className="mini-badge"
+                    onClick={() => duplicate(item)}
+                    style={{
+                      cursor: 'pointer',
+                      border: '1px solid var(--border)',
+                      background: 'var(--card)',
+                      color: 'var(--text)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 5
+                    }}
+                  >
+                    <Copy size={13} />
+                    Copiar
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => remove(item)}
+                    style={{
+                      width: 34,
+                      borderRadius: 9,
+                      border: '1px solid rgba(220,38,38,.16)',
+                      background: 'var(--soft-red)',
+                      color: '#DC2626',
+                      cursor: 'pointer',
+                      display: 'grid',
+                      placeItems: 'center'
+                    }}
+                    title="Eliminar"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </Card>
+            );
+          })}
+
+          {simulations.length === 0 && (
+            <Card>
+              <div className="dashboard-empty" style={{ minHeight: 230 }}>
+                <div className="empty-icon"><Cloud size={28} /></div>
+                <h1 style={{ fontSize: 20 }}>No hay planificaciones</h1>
+                <p style={{ fontSize: 12 }}>
+                  Crea tu primer escenario Cloud para comenzar.
+                </p>
+              </div>
+            </Card>
+          )}
+        </motion.div>
+
+        <motion.div
+          variants={staggerItem}
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'minmax(0, 1.7fr) minmax(280px, .8fr)',
+            gap: 16,
+            marginTop: 16
+          }}
+        >
+          <Card>
+            <div className="card-header">
+              <div>
+                <span className="section-kicker">CONFIGURATION</span>
+                <h3>{editingId ? 'Editar escenario' : 'Nueva planificación'}</h3>
+                <p>
+                  Configura los datos que alimentarán los módulos CloudOps.
+                </p>
+              </div>
+              <Activity size={20} />
+            </div>
+
+            <div className="form-grid">
+              <label>
+                <span>Nombre</span>
+                <input
+                  value={form.name}
+                  onChange={(e) => updateForm('name', e.target.value)}
+                  placeholder="Ej. E-commerce Regional"
+                />
+              </label>
+
+              <label>
+                <span>Tipo de aplicación</span>
+                <select
+                  value={form.type}
+                  onChange={(e) => updateForm('type', e.target.value)}
+                >
+                  <option>Aplicación web empresarial</option>
+                  <option>E-commerce</option>
+                  <option>API / Backend</option>
+                  <option>Portal de clientes</option>
+                </select>
+              </label>
+
+              <label>
+                <span>Región</span>
+                <select
+                  value={form.region}
+                  onChange={(e) => updateForm('region', e.target.value)}
+                >
+                  <option>US East (Ohio)</option>
+                  <option>Europe (Ireland)</option>
+                  <option>South America (São Paulo)</option>
+                </select>
+              </label>
+
+              <label>
+                <span>Usuarios estimados</span>
+                <input
+                  type="number"
+                  min="1"
+                  value={form.users}
+                  onChange={(e) =>
+                    updateForm('users', Math.max(1, Number(e.target.value) || 1))
+                  }
+                />
+              </label>
+
+              <label>
+                <span>Disponibilidad</span>
+                <select
+                  value={form.availability}
+                  onChange={(e) => updateForm('availability', e.target.value)}
+                >
+                  <option>Alta disponibilidad</option>
+                  <option>Estándar</option>
+                  <option>Crítica 24/7</option>
+                </select>
+              </label>
+
+              <label>
+                <span>Objetivo</span>
+                <select
+                  value={form.objective}
+                  onChange={(e) => updateForm('objective', e.target.value)}
+                >
+                  <option>Escalabilidad y reducción de costos</option>
+                  <option>Modernización</option>
+                  <option>Continuidad del negocio</option>
+                  <option>Rendimiento global</option>
+                </select>
+              </label>
+
+              <label className="wide">
+                <span>Descripción</span>
+                <textarea
+                  value={form.description}
+                  onChange={(e) => updateForm('description', e.target.value)}
+                  placeholder="Describe brevemente la solución..."
+                  maxLength={500}
+                />
+              </label>
+
+              <div className="wide">
+                <div className="field-title">Servicios Cloud</div>
+                <p style={{ margin: '4px 0 0', color: 'var(--muted)', fontSize: 11 }}>
+                  Selecciona únicamente los servicios que realmente formarán parte de este escenario.
+                </p>
+
+                <div
+                  className="service-choice-grid"
+                  style={{ marginTop: 10 }}
+                >
+                  {services.map(([service, category, description, Icon]) => {
+                    const active = form.selected.includes(service);
+                    const item = costItems.find((cost) => cost.service === service);
+
+                    return (
+                      <button
+                        type="button"
+                        key={service}
+                        title={description}
+                        onClick={() => toggleService(service)}
+                        className={active ? 'service-choice selected' : 'service-choice'}
+                        style={{ textAlign: 'left', alignItems: 'center' }}
+                      >
+                        <Icon size={17} />
+
+                        <span style={{ minWidth: 0 }}>
+                          <b>{service}</b>
+                          <small>{category}</small>
+                        </span>
+
+                        <span
+                          style={{
+                            marginLeft: 'auto',
+                            display: 'grid',
+                            justifyItems: 'end',
+                            gap: 2,
+                            flexShrink: 0
+                          }}
+                        >
+                          {active && (
+                            <small
+                              style={{
+                                color: 'var(--primary)',
+                                fontWeight: 800,
+                                fontSize: 10
+                              }}
+                            >
+                              {usd(item?.monthly ?? 0)}/mes
+                            </small>
+                          )}
+
+                          {active ? (
+                            <CheckCircle2
+                              size={16}
+                              style={{ color: 'var(--primary)' }}
+                            />
+                          ) : (
+                            <span
+                              style={{
+                                width: 16,
+                                height: 16,
+                                border: '1px solid var(--border)',
+                                borderRadius: '50%'
+                              }}
+                            />
+                          )}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {form.selected.length > 0 && (
+                <div className="wide">
+                  <div className="field-title">Consumo estimado</div>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                      gap: 8,
+                      marginTop: 9
+                    }}
+                  >
+                    {form.selected.map((service) => {
+                      const Icon = icons[service] ?? Server;
+                      const item = costItems.find((cost) => cost.service === service);
+
+                      return (
+                        <div className="simulation-input" key={service}>
+                          <div>
+                            <Icon size={16} />
+                            <span>
+                              <b>{service}</b>
+                              <small>{item?.usage}</small>
+                            </span>
+                          </div>
+
+                          <input
+                            type="number"
+                            min="0"
+                            value={form.quantities[service] ?? 1}
+                            onChange={(e) =>
+                              setQuantity(service, Number(e.target.value))
+                            }
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {costItems.length > 0 && (
+                <div className="wide">
+                  <div className="field-title">Estimación previa</div>
+
+                  <div
+                    style={{
+                      display: 'grid',
+                      gap: 7,
+                      marginTop: 9
+                    }}
+                  >
+                    {costItems.map((item) => (
+                      <div
+                        key={item.service}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 10,
+                          padding: '9px 11px',
+                          border: '1px solid var(--border)',
+                          borderRadius: 10,
+                          background: 'var(--fill)'
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            minWidth: 0
+                          }}
+                        >
+                          <CheckCircle2
+                            size={15}
+                            style={{
+                              color: 'var(--security)',
+                              flexShrink: 0
+                            }}
+                          />
+
+                          <div style={{ minWidth: 0 }}>
+                            <strong
+                              style={{
+                                display: 'block',
+                                fontSize: 11,
+                                color: 'var(--text)'
+                              }}
+                            >
+                              {item.service}
+                            </strong>
+
+                            <small
+                              style={{
+                                color: 'var(--muted)',
+                                fontSize: 9
+                              }}
+                            >
+                              {item.usage}
+                            </small>
+                          </div>
+                        </div>
+
+                        <strong
+                          style={{
+                            color: 'var(--primary)',
+                            fontSize: 11,
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          {usd(item.monthly)}/mes
+                        </strong>
+                      </div>
+                    ))}
+
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '11px',
+                        borderRadius: 10,
+                        background: 'var(--soft-blue)',
+                        marginTop: 2
+                      }}
+                    >
+                      <strong style={{ fontSize: 12, color: 'var(--text)' }}>
+                        Total estimado
+                      </strong>
+
+                      <strong style={{ fontSize: 15, color: 'var(--primary)' }}>
+                        {usd(monthlyCost)}/mes
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="wide form-actions">
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={save}
+                  disabled={!canSave}
+                  style={{ opacity: canSave ? 1 : 0.55 }}
+                >
+                  <CheckCircle2 size={16} />
+                  {editingId ? 'Actualizar escenario' : 'Crear escenario'}
+                </button>
+
+                <button
+                  type="button"
+                  className="mini-badge"
+                  onClick={newSimulation}
+                  style={{
+                    cursor: 'pointer',
+                    border: '1px solid var(--border)',
+                    background: 'var(--card)',
+                    color: 'var(--text)'
+                  }}
+                >
+                  <Plus size={14} />
+                  Limpiar / nuevo
+                </button>
+              </div>
+            </div>
+          </Card>
+
+          <div style={{ display: 'grid', gap: 16 }}>
+            <Card className="estimate-hero">
+              <div className="estimate-label">
+                <CircleDollarSign size={17} />
+                ESTIMACIÓN ACTUAL
+              </div>
+              <strong>{usd(monthlyCost)}</strong>
+              <span>por mes</span>
+              <small>Proyección anual: {usd(annualCost)}</small>
+            </Card>
+
+            <Card className="blueprint-card" variants={staggerItem}>
+              <div className="blueprint-head">
+                <span><Cloud size={18} /></span>
+                <div>
+                  <small>LIVE SIMULATION</small>
+                  <h3>{form.name || 'Nueva solución Cloud'}</h3>
+                </div>
+              </div>
+
+              <div className="blueprint-region">
+                <Globe2 size={15} />
+                <span>{form.region}</span>
+              </div>
+
+              <div className="blueprint-metrics">
+                <div>
+                  <span>Usuarios</span>
+                  <b>{form.users.toLocaleString()}</b>
+                </div>
+                <div>
+                  <span>Servicios</span>
+                  <b>{form.selected.length}</b>
+                </div>
+                <div>
+                  <span>Disponibilidad</span>
+                  <b>{form.availability}</b>
+                </div>
+                <div>
+                  <span>Costo mensual</span>
+                  <b>{usd(monthlyCost)}</b>
+                </div>
+              </div>
+
+              <div className="blueprint-flow">
+                <span>Internet</span><i>→</i>
+                <span style={{ opacity: form.selected.includes('Route 53') ? 1 : 0.35 }}>DNS</span><i>→</i>
+                <span style={{ opacity: form.selected.includes('CloudFront') ? 1 : 0.35 }}>Edge</span><i>→</i>
+                <span style={{ opacity: form.selected.includes('VPC') ? 1 : 0.35 }}>VPC</span><i>→</i>
+                <span style={{ opacity: form.selected.includes('EC2') ? 1 : 0.35 }}>App</span><i>→</i>
+                <span style={{ opacity: form.selected.includes('RDS') ? 1 : 0.35 }}>DB</span>
+              </div>
+
+              {form.selected.length > 0 && (
+                <div className="blueprint-services">
+                  {form.selected.map((service) => (
+                    <span key={service}>
+                      <CheckCircle2 size={12} />
+                      <b>{service}</b>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </Card>
+
+            <Card>
+              <div className="card-header">
+                <div>
+                  <span className="section-kicker">LIVE REVIEW</span>
+                  <h3>Resumen</h3>
+                </div>
+                <Cloud size={19} />
+              </div>
+
+              <div style={{ display: 'grid', gap: 9 }}>
+                <div className="service-function">
+                  <Server size={15} />
+                  <span>
+                    <b>Servicios</b>
+                    <small>{form.selected.length} seleccionados</small>
+                  </span>
+                </div>
+
+                <div className="service-function">
+                  <Users size={15} />
+                  <span>
+                    <b>Usuarios</b>
+                    <small>{form.users.toLocaleString()}</small>
+                  </span>
+                </div>
+
+                <div className="service-function">
+                  <Globe2 size={15} />
+                  <span>
+                    <b>Región</b>
+                    <small>{form.region}</small>
+                  </span>
+                </div>
+
+                <div className="service-function">
+                  <Shield size={15} />
+                  <span>
+                    <b>Seguridad</b>
+                    <small>
+                      {form.selected.includes('IAM')
+                        ? 'IAM incluido'
+                        : 'IAM pendiente'}
+                    </small>
+                  </span>
+                </div>
+              </div>
+            </Card>
+
+            <Card>
+              <div className="card-header">
+                <div>
+                  <span className="section-kicker">NEXT STEP</span>
+                  <h3>Comparación</h3>
+                </div>
+                <Globe2 size={19} />
+              </div>
+
+              <p style={{ marginTop: 0 }}>
+                Ya puedes crear varios escenarios. El siguiente módulo permitirá
+                comparar sus regiones, servicios, disponibilidad y costos.
+              </p>
+
+              <Link
+                className="primary-button"
+                to="/dashboard"
+                style={{ textDecoration: 'none', marginTop: 8 }}
+              >
+                <Activity size={15} />
+                Ver escenario activo
+              </Link>
+            </Card>
+          </div>
+        </motion.div>
+
+        {form.selected.length === 0 && (
+          <motion.div className="pricing-note" variants={staggerItem}>
+            <AlertTriangle size={18} />
+            <div>
+              <b>Selecciona los servicios que utilizarás</b>
+              <span>
+                La estimación aparecerá automáticamente cuando agregues servicios.
+              </span>
+            </div>
+          </motion.div>
+        )}
+      </motion.div>
+    </Page>
+  );
 }
 
 export default Planning;

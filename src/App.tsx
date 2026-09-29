@@ -13,6 +13,7 @@ import Infrastructure from './pages/Infrastructure';
 import Security from './pages/Security';
 import NetworkPage from './pages/Network';
 import Services from './pages/Services';
+import Comparison from './pages/Comparison';
 
 export default function App() {
   return (
@@ -30,6 +31,10 @@ export default function App() {
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/dashboard/planning" element={<Planning />} />
                 <Route path="/dashboard/costs" element={<Costs />} />
+                <Route
+                  path="/dashboard/comparison"
+                  element={<Comparison />}
+                />
                 <Route path="/dashboard/infrastructure" element={<Infrastructure />} />
                 <Route path="/dashboard/security" element={<Security />} />
                 <Route path="/dashboard/network" element={<NetworkPage />} />
