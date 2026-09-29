@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import {
   Activity, AlertTriangle, CheckCircle2, CircleDollarSign, Cloud, Copy,
   Database, Globe2, HardDrive, Pencil, Plus, Route, Server, Shield,
-  Trash2, Users
+  Trash2, Users, MapPin
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
@@ -18,6 +18,8 @@ import {
   type Simulation,
   type SimulationCostItem
 } from '../context/SimulationContext';
+import RegionMap from '../components/RegionMap';
+import { awsRegions } from '../data/awsRegions';
 
 const rates: Record<string, { rate: number; unit: string; detail: string }> = {
   EC2: { rate: 0.0104, unit: 'USD/h', detail: 't3.micro Linux On-Demand' },
@@ -90,6 +92,15 @@ export function Planning() {
 
   const [editingId, setEditingId] = useState<string | null>(
     activeSimulation?.id ?? null
+  );
+  const [showRegionMap, setShowRegionMap] = useState(false);
+
+  const selectedRegionData = useMemo(
+    () =>
+      awsRegions.find(
+        (region) => region.name === form.region
+      ) ?? awsRegions[0],
+    [form.region]
   );
 
   const costItems = useMemo<SimulationCostItem[]>(() => {
@@ -511,17 +522,44 @@ export function Planning() {
                 </select>
               </label>
 
-              <label>
-                <span>Región</span>
-                <select
-                  value={form.region}
-                  onChange={(e) => updateForm('region', e.target.value)}
+              <div>
+                <span style={{ display: 'block', marginBottom: 7 }}>
+                  Región principal
+                </span>
+
+                <button
+                  type="button"
+                  className="region-selector-trigger"
+                  onClick={() => setShowRegionMap(true)}
                 >
-                  <option>US East (Ohio)</option>
-                  <option>Europe (Ireland)</option>
-                  <option>South America (São Paulo)</option>
-                </select>
-              </label>
+                  <span>
+                    <Globe2 size={17} />
+                  </span>
+
+                  <span className="region-selector-trigger-content">
+                    <strong>
+                      {selectedRegionData.name}
+                    </strong>
+
+                    <small>
+                      {selectedRegionData.code} · {selectedRegionData.location}
+                    </small>
+                  </span>
+
+                  <MapPin size={15} />
+                </button>
+
+                <small
+                  style={{
+                    display: 'block',
+                    marginTop: 5,
+                    color: 'var(--muted-2)',
+                    fontSize: 9,
+                  }}
+                >
+                  Haz clic para explorar y seleccionar una región AWS.
+                </small>
+              </div>
 
               <label>
                 <span>Usuarios estimados</span>
@@ -960,7 +998,18 @@ export function Planning() {
               </span>
             </div>
           </motion.div>
-        )}
+          )}
+          {showRegionMap && (
+            <RegionMap
+              value={form.region}
+              onClose={() => setShowRegionMap(false)}
+              onSelect={(region) => {
+                updateForm('region', region.name);
+                setShowRegionMap(false);
+                toast.success(`Región seleccionada: ${region.name}`);
+              }}
+            />
+          )}
       </motion.div>
     </Page>
   );
