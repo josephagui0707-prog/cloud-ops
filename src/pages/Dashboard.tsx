@@ -424,7 +424,7 @@ export function Dashboard() {
         {/* Cabecera */}
         <div className="dashboard-heading-row">
           <Title
-            t="Dashboard ejecutivo"
+            t="Dashboard de planificación activa"
             s={`Vista consolidada de ${simulation.name}`}
           />
 

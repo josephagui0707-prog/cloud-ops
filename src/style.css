@@ -434,6 +434,9 @@ body, .card, .topbar, .sidebar, .form-grid input, .form-grid select, .form-grid 
   display: grid; grid-template-columns: 1.5fr 1fr 1fr .7fr; gap: 12px; align-items: center;
   padding: 12px 8px; border-top: 1px solid var(--border-2); font-size: 11px;
 }
+.pricing-row > :last-child {
+  text-align: center;
+}
 .pricing-row.head { border: 0; background: var(--fill); border-radius: 9px; color: var(--muted); font-weight: 800; }
 .pricing-row > span:first-child { display: grid; gap: 2px; }
 .pricing-row small { font-size: 9px; color: var(--muted-2); }

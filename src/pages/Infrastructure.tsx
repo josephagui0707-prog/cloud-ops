@@ -380,28 +380,28 @@ export function Infrastructure() {
 
             <div className="region-detail-grid">
               <div className="region-detail-item">
-                <span>Ubicación</span>
+                <span>Ubicación: </span>
                 <strong>
                   {primaryRegion.location}
                 </strong>
               </div>
 
               <div className="region-detail-item">
-                <span>Continente</span>
+                <span>Continente: </span>
                 <strong>
                   {primaryRegion.continent}
                 </strong>
               </div>
 
               <div className="region-detail-item">
-                <span>Código de región</span>
+                <span>Código de región: </span>
                 <strong>
                   {primaryRegion.code}
                 </strong>
               </div>
 
               <div className="region-detail-item">
-                <span>Disponibilidad requerida</span>
+                <span>Disponibilidad requerida: </span>
                 <strong>
                   {availabilityLabel}
                 </strong>
@@ -760,5 +760,4 @@ export function Infrastructure() {
     </Page>
   );
 }
-
 export default Infrastructure;

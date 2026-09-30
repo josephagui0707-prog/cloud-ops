@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   Activity, AlertTriangle, CheckCircle2, CircleDollarSign, Cloud, Copy,
   Database, Globe2, HardDrive, Pencil, Plus, Route, Server, Shield,
-  Trash2, Users, MapPin
+  Trash2, Users, MapPin, X, type LucideIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
@@ -31,7 +31,7 @@ const rates: Record<string, { rate: number; unit: string; detail: string }> = {
   VPC: { rate: 0, unit: 'USD/mes', detail: 'Red virtual privada' }
 };
 
-const icons: Record<string, any> = {
+const icons: Record<string, LucideIcon> = {
   EC2: Server,
   RDS: Database,
   S3: HardDrive,
@@ -44,7 +44,19 @@ const icons: Record<string, any> = {
 const defaultSelected: string[] = [];
 const defaultQuantities: Record<string, number> = {};
 
-const emptyForm = {
+type PlanningForm = {
+  name: string;
+  type: string;
+  region: string;
+  users: number;
+  availability: string;
+  objective: string;
+  description: string;
+  selected: string[];
+  quantities: Record<string, number>;
+};
+
+const emptyForm: PlanningForm = {
   name: '',
   type: 'Aplicación web empresarial',
   region: 'US East (Ohio)',
@@ -56,7 +68,7 @@ const emptyForm = {
   quantities: { ...defaultQuantities }
 };
 
-function formFromSimulation(simulation: Simulation) {
+function formFromSimulation(simulation: Simulation): PlanningForm {
   const quantities = simulation.costItems.reduce<Record<string, number>>(
     (acc, item) => ({ ...acc, [item.service]: item.quantity }),
     { ...defaultQuantities }
@@ -86,7 +98,7 @@ export function Planning() {
     duplicateSimulation
   } = useSimulation();
 
-  const [form, setForm] = useState(() =>
+  const [form, setForm] = useState<PlanningForm>(() =>
     activeSimulation ? formFromSimulation(activeSimulation) : emptyForm
   );
 
@@ -94,6 +106,12 @@ export function Planning() {
     activeSimulation?.id ?? null
   );
   const [showRegionMap, setShowRegionMap] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<Simulation | null>(null);
+
+  const editingSimulation = useMemo(
+    () => simulations.find((item) => item.id === editingId) ?? null,
+    [simulations, editingId]
+  );
 
   const selectedRegionData = useMemo(
     () =>
@@ -105,7 +123,7 @@ export function Planning() {
 
   const costItems = useMemo<SimulationCostItem[]>(() => {
     return form.selected.map((service) => {
-      const config = rates[service];
+      const config = rates[service] ?? { rate: 0, unit: 'USD/mes', detail: 'Servicio AWS' };
       const quantity = Math.max(0, form.quantities[service] ?? 1);
       let monthly = 0;
       let usage = `${quantity}`;
@@ -142,15 +160,22 @@ export function Planning() {
 
   const annualCost = monthlyCost * 12;
 
-  const canSave =
-    form.name.trim().length >= 3 &&
-    form.description.trim().length >= 10 &&
-    form.users > 0 &&
-    form.selected.length > 0;
+  const validation = {
+    name: form.name.trim().length >= 3,
+    description: form.description.trim().length >= 10,
+    users: form.users > 0,
+    services: form.selected.length > 0
+  };
 
-  const updateForm = <K extends keyof typeof form>(
+  const canSave: boolean =
+    validation.name &&
+    validation.description &&
+    validation.users &&
+    validation.services;
+
+  const updateForm = <K extends keyof PlanningForm>(
     key: K,
-    value: (typeof form)[K]
+    value: PlanningForm[K]
   ) => {
     setForm((current) => ({ ...current, [key]: value }));
   };
@@ -203,6 +228,7 @@ export function Planning() {
       quantities: {}
     });
     setEditingId(null);
+    setPendingDelete(null);
   };
 
   const save = () => {
@@ -210,6 +236,8 @@ export function Planning() {
       toast.error('Completa correctamente los datos requeridos.');
       return;
     }
+
+    const isEditing = Boolean(editingId && editingSimulation);
 
     const data: SimulationInput = {
       name: form.name.trim(),
@@ -219,25 +247,34 @@ export function Planning() {
       availability: form.availability,
       objective: form.objective,
       description: form.description.trim(),
-      selectedServices: form.selected,
+      selectedServices: [...form.selected],
       costItems,
       monthlyCost,
       annualCost,
-      createdAt:
-        editingId && activeSimulation?.id === editingId
-          ? activeSimulation.createdAt
-          : new Date().toISOString()
+      createdAt: isEditing && editingSimulation
+        ? editingSimulation.createdAt
+        : new Date().toISOString()
     };
 
-    if (editingId) {
-      updateSimulation(editingId, data);
-      setActiveSimulation(editingId);
-      toast.success('Planificación actualizada.');
-    } else {
-      const created = createSimulation(data);
-      setEditingId(created.id);
-      toast.success('Nueva planificación creada.');
+    if (isEditing && editingId) {
+      const updated = updateSimulation(editingId, data);
+
+      if (updated) {
+        setActiveSimulation(editingId);
+        toast.success('Planificación actualizada.');
+      } else {
+        const created = createSimulation(data);
+        setEditingId(created.id);
+        toast.success('La planificación anterior ya no existía. Se creó un nuevo escenario.');
+      }
+
+      return;
     }
+
+    const created = createSimulation(data);
+    setEditingId(created.id);
+    setActiveSimulation(created.id);
+    toast.success('Nueva planificación creada.');
   };
 
   const activate = (simulation: Simulation) => {
@@ -254,15 +291,35 @@ export function Planning() {
     }
   };
 
-  const remove = (simulation: Simulation) => {
-    if (!window.confirm(`¿Eliminar "${simulation.name}"?`)) return;
+  const requestDelete = (simulation: Simulation): void => {
+    setPendingDelete(simulation);
+  };
+
+  const confirmDelete = () => {
+    if (!pendingDelete) return;
+
+    const simulation = pendingDelete;
+    const remaining = simulations.filter((item) => item.id !== simulation.id);
+    const deletingActive = activeSimulation?.id === simulation.id;
+    const deletingEditing = editingId === simulation.id;
 
     deleteSimulation(simulation.id);
+    setPendingDelete(null);
 
-    if (editingId === simulation.id) {
-      const next = simulations.find((item) => item.id !== simulation.id);
-      if (next) loadSimulation(next);
-      else newSimulation();
+    if (remaining.length === 0) {
+      newSimulation();
+      toast.success('Planificación eliminada. Puedes crear una nueva.');
+      return;
+    }
+
+    const next = remaining[0];
+
+    if (deletingActive) {
+      setActiveSimulation(next.id);
+    }
+
+    if (deletingEditing) {
+      loadSimulation(next);
     }
 
     toast.success('Planificación eliminada.');
@@ -445,7 +502,7 @@ export function Planning() {
 
                   <button
                     type="button"
-                    onClick={() => remove(item)}
+                    onClick={() => requestDelete(item)}
                     style={{
                       width: 34,
                       borderRadius: 9,
@@ -819,6 +876,33 @@ export function Planning() {
                 </div>
               )}
 
+              <div className="wide">
+                {!canSave && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: 7,
+                      marginBottom: 10,
+                      padding: '9px 11px',
+                      borderRadius: 10,
+                      border: '1px solid var(--border)',
+                      background: 'var(--fill)',
+                      color: 'var(--muted)',
+                      fontSize: 10
+                    }}
+                  >
+                    <span style={{ fontWeight: 800, color: 'var(--text)' }}>
+                      Completa:
+                    </span>
+                    {!validation.name && <span>nombre (mín. 3 caracteres)</span>}
+                    {!validation.description && <span>descripción (mín. 10 caracteres)</span>}
+                    {!validation.users && <span>usuarios válidos</span>}
+                    {!validation.services && <span>selecciona al menos un servicio</span>}
+                  </div>
+                )}
+              </div>
+
               <div className="wide form-actions">
                 <button
                   type="button"
@@ -828,7 +912,7 @@ export function Planning() {
                   style={{ opacity: canSave ? 1 : 0.55 }}
                 >
                   <CheckCircle2 size={16} />
-                  {editingId ? 'Actualizar escenario' : 'Crear escenario'}
+                  {editingSimulation ? 'Actualizar escenario' : 'Crear escenario'}
                 </button>
 
                 <button
@@ -999,6 +1083,171 @@ export function Planning() {
             </div>
           </motion.div>
           )}
+          <AnimatePresence>
+            {pendingDelete && (
+              <motion.div
+                key="delete-confirmation"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setPendingDelete(null)}
+                style={{
+                  position: 'fixed',
+                  inset: 0,
+                  zIndex: 1200,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 16,
+                  background: 'rgba(2, 6, 23, .62)',
+                  backdropFilter: 'blur(5px)'
+                }}
+                role="presentation"
+              >
+                <motion.div
+                  initial={{ opacity: 0, y: 12, scale: .97 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 8, scale: .98 }}
+                  transition={{ duration: .18 }}
+                  onClick={(event) => event.stopPropagation()}
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="delete-simulation-title"
+                  style={{
+                    width: 'min(92vw, 460px)',
+                    maxHeight: '90vh',
+                    overflowY: 'auto',
+                    border: '1px solid var(--border)',
+                    borderRadius: 18,
+                    background: 'var(--card)',
+                    color: 'var(--text)',
+                    boxShadow: '0 24px 70px rgba(0,0,0,.28)',
+                    padding: 20
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start',
+                      gap: 12
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 42,
+                        height: 42,
+                        borderRadius: 12,
+                        display: 'grid',
+                        placeItems: 'center',
+                        background: 'var(--soft-red)',
+                        color: 'var(--danger, #DC2626)',
+                        flexShrink: 0
+                      }}
+                    >
+                      <Trash2 size={20} />
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setPendingDelete(null)}
+                      aria-label="Cerrar confirmación"
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 9,
+                        border: '1px solid var(--border)',
+                        background: 'var(--fill)',
+                        color: 'var(--muted)',
+                        cursor: 'pointer',
+                        display: 'grid',
+                        placeItems: 'center',
+                        flexShrink: 0
+                      }}
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+
+                  <div style={{ marginTop: 16 }}>
+                    <span className="section-kicker">CONFIRMAR ACCIÓN</span>
+                    <h3
+                      id="delete-simulation-title"
+                      style={{ margin: '5px 0 7px', color: 'var(--text)' }}
+                    >
+                      ¿Eliminar esta planificación?
+                    </h3>
+                    <p
+                      style={{
+                        margin: 0,
+                        color: 'var(--muted)',
+                        fontSize: 12,
+                        lineHeight: 1.6
+                      }}
+                    >
+                      Vas a eliminar{' '}
+                      <strong style={{ color: 'var(--text)' }}>
+                        “{pendingDelete.name}”
+                      </strong>
+                      . Esta acción quitará el escenario de tu lista de planificaciones.
+                    </p>
+                  </div>
+
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: 8,
+                      flexWrap: 'wrap',
+                      marginTop: 20
+                    }}
+                  >
+                    <button
+                      type="button"
+                      className="mini-badge"
+                      onClick={() => setPendingDelete(null)}
+                      style={{
+                        flex: '1 1 130px',
+                        minHeight: 40,
+                        cursor: 'pointer',
+                        border: '1px solid var(--border)',
+                        background: 'var(--fill)',
+                        color: 'var(--text)',
+                        display: 'inline-flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        gap: 6
+                      }}
+                    >
+                      Cancelar
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={confirmDelete}
+                      style={{
+                        flex: '1 1 130px',
+                        minHeight: 40,
+                        cursor: 'pointer',
+                        border: '1px solid rgba(220,38,38,.22)',
+                        borderRadius: 10,
+                        background: 'var(--danger, #DC2626)',
+                        color: '#fff',
+                        display: 'inline-flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        gap: 6,
+                        fontWeight: 800
+                      }}
+                    >
+                      <Trash2 size={15} />
+                      Sí, eliminar
+                    </button>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {showRegionMap && (
             <RegionMap
               value={form.region}
