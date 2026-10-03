@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Activity,
@@ -13,6 +13,7 @@ import {
   Cloud,
   Database,
   Gauge,
+  FileText,
   Globe2,
   Layers3,
   Link2,
@@ -51,6 +52,7 @@ import {
 } from '../components/PageUI';
 
 import { useSimulation } from '../context/SimulationContext';
+import ReportModal from '../components/ReportModal';
 
 const chartColors = [
   '#2563EB',
@@ -73,6 +75,8 @@ export function Dashboard() {
     simulation,
     clearSimulation,
   } = useSimulation();
+
+  const [showReport, setShowReport] = useState(false);
 
   const selectedServices =
     simulation?.selectedServices ?? [];
@@ -428,19 +432,43 @@ export function Dashboard() {
             s={`Vista consolidada de ${simulation.name}`}
           />
 
-          <motion.button
-            className="danger-outline-button"
-            onClick={clearSimulation}
-            whileHover={{
-              y: -1,
-            }}
-            whileTap={{
-              scale: 0.98,
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              gap: 8,
+              flexWrap: 'wrap',
             }}
           >
-            <Trash2 size={16} />
-            Eliminar simulación
-          </motion.button>
+            <motion.button
+              type="button"
+              className="primary-button"
+              onClick={() => setShowReport(true)}
+              whileHover={{ y: -1 }}
+              whileTap={{ scale: 0.98 }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 7,
+              }}
+            >
+              <FileText size={16} />
+              Generar reporte
+            </motion.button>
+
+            <motion.button
+              type="button"
+              className="danger-outline-button"
+              onClick={clearSimulation}
+              whileHover={{ y: -1 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <Trash2 size={16} />
+              Eliminar simulación
+            </motion.button>
+          </div>
         </div>
 
         {/* Identidad de la simulación */}
@@ -1514,6 +1542,19 @@ export function Dashboard() {
           </div>
         </motion.div>
       </motion.div>
+
+      {showReport && (
+        <ReportModal
+          simulation={simulation}
+          regionCode={regionCode}
+          simulationDate={simulationDate}
+          securityScore={security.score}
+          securityLabel={security.label}
+          architectureState={architectureState}
+          architectureFlow={architectureFlow}
+          onClose={() => setShowReport(false)}
+        />
+      )}
     </Page>
   );
 }
