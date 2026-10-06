@@ -1,0 +1,12 @@
+# Dependencias
+node_modules/
+
+# Logs y registros
+*.log
+
+# Archivos temporales de TypeScript
+*.tsbuildinfo
+
+# Carpetas de producción (cuando ejecutes npm run build)
+dist/
+build/
