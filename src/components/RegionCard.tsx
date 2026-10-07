@@ -1,0 +1,2 @@
+import { ReactNode } from 'react';
+export default function RegionCard({name,code,status,services,icon}:{name:string;code:string;status:string;services:string[];icon?:ReactNode}){return <div className="card region-card"><div className="stat-top"><span className="stat-icon blue">{icon}</span><span className="mini-badge">{code}</span></div><h3>{name}</h3><p>{status}</p><small>{services.join(' · ')}</small></div>}
