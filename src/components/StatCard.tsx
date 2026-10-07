@@ -1,0 +1,2 @@
+import { ReactNode } from 'react';
+export default function StatCard({label,value,detail,icon,accent='blue'}:{label:string;value:string;detail?:string;icon?:ReactNode;accent?:'blue'|'green'|'amber'}){return <div className="card stat-card premium"><div className="stat-top"><span className={`stat-icon ${accent}`}>{icon}</span></div><span className="stat-label">{label}</span><strong>{value}</strong>{detail&&<small>{detail}</small>}</div>}
