@@ -27,7 +27,10 @@ export function isFailureAvailable(failure: Failure, services: string[]) {
   return false;
 }
 export function budgetLevel(cost: number, limit?: number) {
-  if (!Number.isFinite(limit) || limit <= 0) return 'unset';
+  // Si no viene limit, o no es un número finito, o es menor/igual a cero
+  if (limit === undefined || !Number.isFinite(limit) || limit <= 0) return 'unset';
+  
+  // Ahora TypeScript sabe que "limit" sí o sí es un número válido
   return cost >= limit ? 'critical' : cost >= limit * .8 ? 'warning' : 'ok';
 }
 export function evaluateFailure(services: string[], config: LabConfig) {
