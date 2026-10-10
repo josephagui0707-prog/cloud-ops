@@ -320,7 +320,7 @@ export default function RegionMap({
                 minZoom={1}
                 maxZoom={4}
               >
-                <Geographies geography={worldAtlas}>
+                <Geographies geography={worldAtlas as any}>
                   {({ geographies }) =>
                     geographies.map((geo) => (
                       <Geography
@@ -331,7 +331,6 @@ export default function RegionMap({
                     ))
                   }
                 </Geographies>
-
                 <Line
                   from={origin.coordinates}
                   to={selected.coordinates}
