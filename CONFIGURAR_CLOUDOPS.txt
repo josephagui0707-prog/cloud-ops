@@ -1,0 +1,3 @@
+Para entrar SIN Google con las credenciales existentes, lee GUIA_LOGIN_CREDENCIALES.md.
+Ejecuta CONFIGURAR_USUARIOS.bat una vez, después INICIAR_CLOUDOPS.bat.
+Gemini utiliza GEMINI_API_KEY en el backend.
