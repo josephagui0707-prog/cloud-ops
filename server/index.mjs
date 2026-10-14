@@ -13,7 +13,32 @@ const MAX_BODY=12*1024*1024;
 const SUPABASE_URL=(process.env.VITE_SUPABASE_URL||'').replace(/\/$/,'');
 const SUPABASE_KEY=process.env.VITE_SUPABASE_ANON_KEY||'';
 const limit=new Map();
-function json(res,status,body){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(body));}
+
+function setCorsHeaders(req, res) {
+  const origin = req.headers.origin;
+  const allowedOrigins = [
+    'https://cloudops-dashboard-toan.onrender.com',
+    'http://localhost:5173',
+    'http://localhost:3000'
+  ];
+
+  if (allowedOrigins.includes(origin) || !origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+}
+
+function json(res,status,body){
+  res.writeHead(status,{
+    'Content-Type':'application/json; charset=utf-8',
+    'Cache-Control':'no-store',
+    'X-Content-Type-Options':'nosniff'
+  });
+  res.end(JSON.stringify(body));
+}
+
 async function bodyJSON(req){let size=0;const chunks=[];for await(const part of req){size+=part.length;if(size>MAX_BODY){const e=Error('El archivo supera el límite de 8 MB (codificado).');e.status=413;throw e;}chunks.push(part);}try{return JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{const e=Error('Se esperaba un cuerpo JSON válido.');e.status=400;throw e;}}
 function credentials(){if(!SUPABASE_URL||!SUPABASE_KEY||SUPABASE_KEY.startsWith('PEGA_')){const e=Error('Configura URL y clave pública de Supabase en el servidor.');e.status=503;throw e;}}
 async function auth(req){
@@ -68,8 +93,6 @@ async function handleApi(req,res,url){
   const input=await bodyJSON(req);
   const q=typeof input.question==='string'?input.question.trim():'';
   if(!q||q.length>2200)return json(res,400,{error:'Escribe una pregunta (hasta 2200 caracteres).'});
-  // El usuario elige explícitamente si quiere ayuda general o hablar de un informe privado.
-  // El modo general NO envía ni consulta contenido de proyectos.
   const mode=input.mode==='project'?'project':'general';
   let context='';
   if(mode==='project'){
@@ -92,7 +115,17 @@ async function handleApi(req,res,url){
  }
  return json(res,404,{error:'API no encontrada.'});
 }
+
 async function handle(req,res){
+ setCorsHeaders(req, res);
+
+ // Responder inmediatamente a las solicitudes Preflight (OPTIONS)
+ if (req.method === 'OPTIONS') {
+   res.writeHead(204);
+   res.end();
+   return;
+ }
+
  const url=new URL(req.url,'http://localhost');
  if(url.pathname.startsWith('/api/')){
   try{return await handleApi(req,res,url);}catch(e){const status=Number(e.status)||(/abort|timeout/i.test(e.message)?504:502);console.error('CloudOps API:',e.message);return json(res,status,{error:e.message||'Error del servidor'});}
@@ -105,4 +138,5 @@ async function handle(req,res){
   res.writeHead(200,{'Content-Type':mime[extname(path)]||'application/octet-stream','X-Content-Type-Options':'nosniff','Content-Security-Policy':"frame-ancestors 'self'"});res.end(content);
  }catch{json(res,404,{error:'No existe dist. Ejecuta npm run build.'});}
 }
+
 http.createServer(handle).listen(PORT,'0.0.0.0',()=>console.log(`CloudOps + Gemini API en http://localhost:${PORT}`));
