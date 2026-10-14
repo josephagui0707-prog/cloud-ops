@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   Activity, AlertTriangle, CheckCircle2, Cloud, Copy, Database, Globe2,
@@ -18,6 +18,7 @@ import {
 } from '../context/SimulationContext';
 import RegionMap from '../components/RegionMap';
 import { awsRegions } from '../data/awsRegions';
+import { estimateRegionLatency, latencyOrigins, latencyProfiles } from '../lib/regionLatency';
 
 const rates: Record<string, { rate: number; unit: string; detail: string }> = {
   EC2: { rate: 0.0104, unit: 'USD/h', detail: 't3.micro Linux On-Demand' },
@@ -135,9 +136,10 @@ export function Planning() {
     activeSimulation ? formFromSimulation(activeSimulation) : emptyForm
   );
   const [editingId, setEditingId] = useState<string | null>(activeSimulation?.id ?? null);
-  const formSection = useRef<HTMLDivElement>(null);
-  const nameInput = useRef<HTMLInputElement>(null);
   const [showRegionMap, setShowRegionMap] = useState(false);
+  const [latencyOriginId, setLatencyOriginId] = useState('lima');
+  const [latencyProfileId, setLatencyProfileId] = useState('fiber');
+  const [latencyPayloadMiB, setLatencyPayloadMiB] = useState(1);
   const [pendingDelete, setPendingDelete] = useState<Simulation | null>(null);
 
   const editingSimulation = useMemo(
@@ -148,6 +150,12 @@ export function Planning() {
   const selectedRegionData = useMemo(
     () => awsRegions.find((region) => region.name === form.region) ?? awsRegions[0],
     [form.region]
+  );
+
+  const latencyOrigin = latencyOrigins.find((origin) => origin.id === latencyOriginId) ?? latencyOrigins[0];
+  const latencyProfile = latencyProfiles.find((profile) => profile.id === latencyProfileId) ?? latencyProfiles[0];
+  const selectedLatency = estimateRegionLatency(
+    latencyOrigin.coordinates, selectedRegionData.coordinates, latencyProfile, latencyPayloadMiB
   );
 
   const validation = {
@@ -188,11 +196,6 @@ export function Planning() {
     setForm({ ...emptyForm, selected: [] });
     setEditingId(null);
     setPendingDelete(null);
-    setShowRegionMap(false);
-    requestAnimationFrame(() => {
-      formSection.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      nameInput.current?.focus({ preventScroll: true });
-    });
   };
 
   const save = () => {
@@ -203,7 +206,7 @@ export function Planning() {
     }
 
     const isEditing = Boolean(editingId && editingSimulation);
-    const currentItems = isEditing ? editingSimulation?.costItems ?? [] : [];
+    const currentItems = editingSimulation?.costItems ?? activeSimulation?.costItems ?? [];
     const selectedCostItems = getCostItemsForPlanning(form.selected, currentItems);
     const monthlyCost = selectedCostItems.reduce((sum, item) => sum + item.monthly, 0);
 
@@ -461,10 +464,8 @@ export function Planning() {
         </motion.div>
 
         <motion.div
-          ref={formSection}
           variants={staggerItem}
           style={{
-            scrollMarginTop: 100,
             display: 'grid',
             gridTemplateColumns: 'minmax(0, 1.7fr) minmax(280px, .8fr)',
             gap: 16,
@@ -484,7 +485,7 @@ export function Planning() {
             <div className="form-grid">
               <label>
                 <span>Nombre</span>
-                <input ref={nameInput} value={form.name} onChange={(e) => updateForm('name', e.target.value)} placeholder="Ej. E-commerce Regional" />
+                <input value={form.name} onChange={(e) => updateForm('name', e.target.value)} placeholder="Ej. E-commerce Regional" />
               </label>
 
               <label>
@@ -508,7 +509,8 @@ export function Planning() {
                   <MapPin size={15} />
                 </button>
                 <small style={{ display: 'block', marginTop: 5, color: 'var(--muted-2)', fontSize: 9 }}>
-                  Explora y selecciona una región AWS.
+                  RTT aproximado desde {latencyOrigin.label} ({latencyProfile.label}):
+                  {' '}<b>{selectedLatency.rttMs} ms</b>. Pulsa para comparar regiones y ver el recorrido animado.
                 </small>
               </div>
 
@@ -748,6 +750,14 @@ export function Planning() {
         {showRegionMap && (
           <RegionMap
             value={form.region}
+            originId={latencyOriginId}
+            profileId={latencyProfileId}
+            payloadMiB={latencyPayloadMiB}
+            onSettingsChange={(originId, profileId, payloadMiB) => {
+              setLatencyOriginId(originId);
+              setLatencyProfileId(profileId);
+              setLatencyPayloadMiB(payloadMiB);
+            }}
             onClose={() => setShowRegionMap(false)}
             onSelect={(region) => {
               updateForm('region', region.name);
