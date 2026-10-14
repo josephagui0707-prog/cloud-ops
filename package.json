@@ -6,9 +6,13 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+<<<<<<< HEAD
     "preview": "vite preview",
     "start": "node --env-file-if-exists=.env server/index.mjs",
     "dev:full": "node --env-file-if-exists=.env server/index.mjs"
+=======
+    "preview": "vite preview"
+>>>>>>> 1df728fd4bbb8375232c6ad45e5541837072bcc2
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
@@ -22,8 +26,12 @@
     "react-simple-maps": "^5.0.5",
     "recharts": "^2.15.0",
     "sonner": "^2.0.8",
+<<<<<<< HEAD
     "world-atlas": "^2.0.2",
     "jszip": "^3.10.1"
+=======
+    "world-atlas": "^2.0.2"
+>>>>>>> 1df728fd4bbb8375232c6ad45e5541837072bcc2
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",

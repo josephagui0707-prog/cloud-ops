@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # CloudOps + Análisis Inteligente IA Empresarial
 
 **Lee primero [GUIA_IA_EMPRESARIAL.md](GUIA_IA_EMPRESARIAL.md).** La instalación requiere dar de alta las cuentas en Supabase Auth por correo/contraseña, aplicar `supabase/ai_analysis_secure.sql` y pegar la clave privada Gemini solo en el backend. Ejecuta `INICIAR_CLOUDOPS.bat` (Windows) o `npm ci && npm run build && npm start`. Dirección: http://localhost:3001.
@@ -6,6 +7,8 @@ El nuevo módulo contiene diez submódulos, análisis de ZIP por Gemini, AWS Wel
 
 ---
 
+=======
+>>>>>>> 1df728fd4bbb8375232c6ad45e5541837072bcc2
 # CloudOps Dashboard
 
 Aplicación web profesional desarrollada con React + TypeScript para representar una propuesta de solución Cloud basada en AWS.
