@@ -1,9 +1,12 @@
 // Autenticación real de Supabase mediante correo y contraseña.
 // La clave pública se utiliza en el cliente; la clave de servicio nunca se publica.
-const url = ((import.meta.env.VITE_SUPABASE_URL as string | undefined) || '').replace(/\/$/, '');
+const url = ((import.meta.env.VITE_SUPABASE_URL as string | undefined) || '').replace(/\/\$/, '');
 const key = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) || '';
 const SESSION = 'cloudops.auth.password.v1';
 const LEGACY_GOOGLE_SESSION = 'cloudops.supabase.oauth';
+
+// Detecta la URL de tu Web Service de Render en producción. Si no existe, usa la ruta local vacía.
+const BACKEND_URL = (((import.meta.env as any)['VITE_API_URL'] as string | undefined) || '').replace(/\/$/, '');
 
 export interface PasswordSession {
   access_token: string;
@@ -111,7 +114,11 @@ export async function getVerifiedSession(): Promise<PasswordSession | null> {
 export async function aiRequest(path: string, options: RequestInit = {}) {
   const token = await getAccessToken();
   if (!token) throw Error('Inicia sesión con las credenciales de CloudOps para usar el análisis privado.');
-  return fetch(path, {
+  
+  // Combina dinámicamente la URL del backend (ej: https://onrender.com) con el path (ej: /api/ai/analyze)
+  const fullUrl = `${BACKEND_URL}${path}`;
+
+  return fetch(fullUrl, {
     ...options,
     headers: {
       Authorization: `Bearer ${token}`,
