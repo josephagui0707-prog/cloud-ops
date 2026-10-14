@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
-  Activity, History,
+  Activity,
   Boxes,
   Cloud,
   Coins,
@@ -11,7 +11,6 @@ import {
   ServerCog,
   ShieldCheck,
   Layers3,
-  Sparkles,
   BrainCircuit,
   ChevronDown,
 } from 'lucide-react';
@@ -28,21 +27,35 @@ const nav = [
   ['/dashboard/security', 'Seguridad', ShieldCheck, false],
   ['/dashboard/network', 'Arquitectura de Red', Network, false],
   ['/dashboard/services', 'Servicios AWS', Boxes, false],
-  ['/dashboard/failures', 'Simulador de fallos', Activity, false],
-  ['/dashboard/history', 'Historial de cambios', History, false],
-  ['/dashboard/integrations', 'APIs e Integraciones', Sparkles, false],
+  ['/dashboard/operations', 'Operaciones', Activity, false],
 ] as const;
 
 const aiSubmenu = [
-  ['upload','Subir proyecto ZIP'],['general','Análisis general'],['risks','Riesgos y vulnerabilidades'],
-  ['security','Seguridad del proyecto'],['aws','Arquitectura y servicios AWS'],['performance','Rendimiento y escalabilidad'],
-  ['costs','Costos e impacto económico'],['recommendations','Recomendaciones'],['history','Historial de análisis'],['reports','Reportes']
+  ['upload', 'Subir proyecto ZIP'],
+  ['general', 'Análisis general'],
+  ['risks', 'Riesgos y vulnerabilidades'],
+  ['security', 'Seguridad del proyecto'],
+  ['aws', 'Arquitectura y servicios AWS'],
+  ['performance', 'Rendimiento y escalabilidad'],
+  ['costs', 'Costos e impacto económico'],
+  ['recommendations', 'Recomendaciones'],
+  ['history', 'Historial de análisis'],
+  ['reports', 'Reportes'],
 ];
+
 export default function Sidebar() {
   const { simulation } = useSimulation();
   const location = useLocation();
-  const [aiOpen, setAiOpen] = useState(location.pathname.startsWith('/dashboard/ai-analysis'));
-  useEffect(() => { if (location.pathname.startsWith('/dashboard/ai-analysis')) setAiOpen(true); }, [location.pathname]);
+
+  const [aiOpen, setAiOpen] = useState(
+    location.pathname.startsWith('/dashboard/ai-analysis')
+  );
+
+  useEffect(() => {
+    if (location.pathname.startsWith('/dashboard/ai-analysis')) {
+      setAiOpen(true);
+    }
+  }, [location.pathname]);
 
   return (
     <aside className="sidebar">
@@ -74,28 +87,49 @@ export default function Sidebar() {
         {nav.map(([path, name, Icon, exact]) => {
           if (path === '/dashboard/ai-analysis') {
             const isAiActive = location.pathname.startsWith(path);
+
             return (
-              <div key={path} className={`nav-group ${isAiActive ? 'group-active' : ''}`}>
+              <div
+                key={path}
+                className={`nav-group ${isAiActive ? 'group-active' : ''}`}
+              >
                 <button
                   type="button"
-                  className={`nav-item ai-sidebar-main ${isAiActive ? 'active' : ''}`}
-                  onClick={() => setAiOpen((value) => !value)}
+                  className={`nav-item ai-sidebar-main ${
+                    isAiActive ? 'active' : ''
+                  }`}
+                  onClick={() => setAiOpen(value => !value)}
                   aria-expanded={aiOpen}
                   aria-controls="cloudops-ai-submodules"
-                  aria-label={`${aiOpen ? 'Ocultar' : 'Mostrar'} submódulos de Análisis de proyectos IA`}
+                  aria-label={`${
+                    aiOpen ? 'Ocultar' : 'Mostrar'
+                  } submódulos de Análisis de proyectos IA`}
                 >
                   <Icon size={19} />
                   <span>{name}</span>
-                  <ChevronDown className={`ai-sidebar-arrow ${aiOpen ? 'open' : ''}`} size={17} aria-hidden="true" />
+                  <ChevronDown
+                    className={`ai-sidebar-arrow ${aiOpen ? 'open' : ''}`}
+                    size={17}
+                    aria-hidden="true"
+                  />
                 </button>
 
                 {aiOpen && (
-                  <div className="ai-sidebar-subnav" id="cloudops-ai-submodules">
+                  <div
+                    className="ai-sidebar-subnav"
+                    id="cloudops-ai-submodules"
+                  >
                     {aiSubmenu.map(([tab, label], i) => (
                       <NavLink
                         key={tab}
                         to={`${path}?tab=${tab}`}
-                        className={() => isAiActive && (new URLSearchParams(location.search).get('tab') || 'upload') === tab ? 'active' : ''}
+                        className={() =>
+                          isAiActive &&
+                          (new URLSearchParams(location.search).get('tab') ||
+                            'upload') === tab
+                            ? 'active'
+                            : ''
+                        }
                       >
                         {i + 1}. {label}
                       </NavLink>
@@ -128,15 +162,11 @@ export default function Sidebar() {
 
         <div>
           <strong>
-            {simulation
-              ? 'Simulación activa'
-              : 'Entorno preparado'}
+            {simulation ? 'Simulación activa' : 'Entorno preparado'}
           </strong>
 
           <span>
-            {simulation
-              ? simulation.region
-              : 'Sin escenario generado'}
+            {simulation ? simulation.region : 'Sin escenario generado'}
           </span>
         </div>
       </div>

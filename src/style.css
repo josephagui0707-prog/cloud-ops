@@ -1505,7 +1505,27 @@ body, .card, .topbar, .sidebar, .form-grid input, .form-grid select, .form-grid 
 .ops h3 { font-size:15px; font-weight:700; margin-bottom:14px; }
 .ops p { color:var(--muted); line-height:1.65; margin:6px 0 15px; }
 .ops-tabs,.ops-controls,.ops-options,.ops-budget-form,.ops-heading { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:20px; }
-.ops-tabs a { display:flex; gap:8px; align-items:center; background:var(--card); border:1px solid var(--border); padding:12px 18px; border-radius:12px; }
+.ops-tabs a {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  background: var(--card);
+  color: var(--text);
+  text-decoration: none;
+  border: 1px solid var(--border);
+  padding: 12px 18px;
+  border-radius: 12px;
+}
+
+.ops-tabs a.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+.ops-tabs a:hover:not(.active) {
+  border-color: var(--primary);
+}
 .ops a { color:var(--primary); }
 .ops button { padding:11px 16px; border:1px solid var(--border-strong); background:var(--card); border-radius:10px; cursor:pointer; font-weight:650; color:var(--text); }
 .ops button.selected,.ops button[type=submit] { background:var(--primary);color:white;border-color:var(--primary); }

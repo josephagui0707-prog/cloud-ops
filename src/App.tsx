@@ -1,5 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import { Toaster } from 'sonner'; // <-- Importante
+import { Toaster } from 'sonner';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { SimulationProvider } from './context/SimulationContext';
@@ -14,7 +14,6 @@ import Security from './pages/Security';
 import NetworkPage from './pages/Network';
 import Services from './pages/Services';
 import Comparison from './pages/Comparison';
-import Integrations from './pages/Integrations';
 import Operations from './pages/Operations';
 import AIProjectAnalysis from './pages/AIProjectAnalysis';
 import { OperationsProvider } from './operations/OperationsContext';
@@ -24,34 +23,118 @@ export default function App() {
     <ThemeProvider>
       <SimulationProvider>
         <AuthProvider>
-          <OperationsProvider><BrowserRouter>
+          <OperationsProvider>
+            <BrowserRouter>
+              <Toaster
+                richColors
+                position="top-right"
+                closeButton
+              />
 
-            <Toaster richColors position="top-right" closeButton />
-            
-            <Routes>
-              <Route path="/login" element={<Login />} />
-              <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/dashboard/ai-analysis" element={<AIProjectAnalysis />} />
-                <Route path="/dashboard/planning" element={<Planning />} />
-                <Route path="/dashboard/costs" element={<Costs />} />
+              <Routes>
+                <Route path="/login" element={<Login />} />
+
                 <Route
-                  path="/dashboard/comparison"
-                  element={<Comparison />}
-                />
-                <Route path="/dashboard/infrastructure" element={<Infrastructure />} />
-                <Route path="/dashboard/security" element={<Security />} />
-                <Route path="/dashboard/network" element={<NetworkPage />} />
-                <Route path="/dashboard/services" element={<Services />} />
-                <Route path="/dashboard/failures" element={<Operations />} />
-                <Route path="/dashboard/budgets" element={<Navigate to="/dashboard/costs" replace />} />
-                <Route path="/dashboard/history" element={<Operations />} />
-                <Route path="/dashboard/integrations" element={<Integrations />} />
-                <Route path="*" element={<Navigate to="/dashboard" replace />} />
-              </Route>
-            </Routes>
-          </BrowserRouter></OperationsProvider>
+                  element={
+                    <ProtectedRoute>
+                      <DashboardLayout />
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route
+                    path="/"
+                    element={<Navigate to="/dashboard" replace />}
+                  />
+
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route
+                    path="/dashboard/ai-analysis"
+                    element={<AIProjectAnalysis />}
+                  />
+                  <Route
+                    path="/dashboard/planning"
+                    element={<Planning />}
+                  />
+                  <Route
+                    path="/dashboard/costs"
+                    element={<Costs />}
+                  />
+                  <Route
+                    path="/dashboard/comparison"
+                    element={<Comparison />}
+                  />
+                  <Route
+                    path="/dashboard/infrastructure"
+                    element={<Infrastructure />}
+                  />
+                  <Route
+                    path="/dashboard/security"
+                    element={<Security />}
+                  />
+                  <Route
+                    path="/dashboard/network"
+                    element={<NetworkPage />}
+                  />
+                  <Route
+                    path="/dashboard/services"
+                    element={<Services />}
+                  />
+
+                  {/* Módulo unificado */}
+                  <Route
+                    path="/dashboard/operations"
+                    element={<Operations />}
+                  />
+
+                  {/* Compatibilidad con las rutas anteriores */}
+                  <Route
+                    path="/dashboard/failures"
+                    element={
+                      <Navigate
+                        to="/dashboard/operations?tab=failures"
+                        replace
+                      />
+                    }
+                  />
+
+                  <Route
+                    path="/dashboard/history"
+                    element={
+                      <Navigate
+                        to="/dashboard/operations?tab=history"
+                        replace
+                      />
+                    }
+                  />
+
+                  <Route
+                    path="/dashboard/integrations"
+                    element={
+                      <Navigate
+                        to="/dashboard/operations?tab=integrations"
+                        replace
+                      />
+                    }
+                  />
+
+                  <Route
+                    path="/dashboard/budgets"
+                    element={
+                      <Navigate
+                        to="/dashboard/costs"
+                        replace
+                      />
+                    }
+                  />
+
+                  <Route
+                    path="*"
+                    element={<Navigate to="/dashboard" replace />}
+                  />
+                </Route>
+              </Routes>
+            </BrowserRouter>
+          </OperationsProvider>
         </AuthProvider>
       </SimulationProvider>
     </ThemeProvider>

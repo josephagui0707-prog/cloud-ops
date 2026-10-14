@@ -24,6 +24,7 @@ import {
   usd,
 } from '../components/PageUI';
 import { useSimulation } from '../context/SimulationContext';
+import OperationsTabs from '../components/OperationsTab';
 
 type TranslationResponse = {
   responseData?: {
@@ -404,6 +405,7 @@ export default function Integrations() {
           s="Servicios gratuitos para demostrar traducción, voz, FinOps y seguridad sin depender de una cuenta AWS"
           tag="CLOUD EXTENSIONS"
         />
+        <OperationsTabs />
 
         <motion.div
           className="simulation-meta-strip"
